@@ -1,51 +1,84 @@
-class ShowsController < ApplicationController
-  before_action :set_show, only: [:show, :update, :destroy]
+class UsersController < ApplicationController
 
-  # GET /shows
+  before_action :set_user, only: [:show, :update, :destroy]
+  before_action :authenticate_token, except: [:login, :create, :index]
+  before_action :authorize_user, except: [:login, :create, :index]
+
+
+    # Login
+    def login
+      user = User.find_by(username: params[:user][:username])
+
+      if user && user.authenticate(params[:user][:password])
+        token = create_token(user.id, user.username)
+        render json: {status: 200, token: token, user: user}
+      else
+        render json: {status: 401, message: "Unauthorized"}
+      end
+    end
+
+  # GET /users
   def index
-    @shows = Show.all
+    @users = User.all
 
-    # render json: @shows
+    render json: @users
   end
 
-  # GET /shows/1
+  # GET /users/1
   def show
-    render json: @show
+    render json: @user
   end
 
-  # POST /shows
+  # POST /users
   def create
-    @show = Show.new(show_params)
+    @user = User.new(user_params)
 
-    if @show.save
-      render json: @show, status: :created, location: @show
+    if @user.save
+      render json: @user, status: :created, location: @user
     else
-      render json: @show.errors, status: :unprocessable_entity
+      render json: @user.errors, status: :unprocessable_entity
     end
   end
 
-  # PATCH/PUT /shows/1
+  # PATCH/PUT /users/1
   def update
-    if @show.update(show_params)
-      render json: @show
+    if @user.update(user_params)
+      render json: @user
     else
-      render json: @show.errors, status: :unprocessable_entity
+      render json: @user.errors, status: :unprocessable_entity
     end
   end
 
-  # DELETE /shows/1
+  # DELETE /users/1
   def destroy
-    @show.destroy
+    @user.destroy
   end
+
 
   private
+    # create_token is a method to trigger the token generation process.
+    def create_token(id, username)
+      JWT.encode(payload(id, username), ENV['JWT_SECRET'], 'HS256')
+    end
+    # payload method returns an object (hash) that includes user info
+    def payload(id, username)
+      {
+        exp: (Time.now + 30.minutes).to_i,
+        iat: Time.now.to_i,
+        iss: ENV['JWT_ISSUER'],
+        user: {
+          id: id,
+          username: username
+        }
+      }
+    end
     # Use callbacks to share common setup or constraints between actions.
-    def set_show
-      @show = Show.find(params[:id])
+    def set_user
+      @user = User.find(params[:id])
     end
 
     # Only allow a trusted parameter "white list" through.
-    def show_params
-      params.require(:show).permit(:name, :start, :description, :user_id)
+    def user_params
+      params.require(:user).permit(:username, :email, :password)
     end
 end
